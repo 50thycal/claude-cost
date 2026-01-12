@@ -1,0 +1,9 @@
+{
+  "name": "claude-code-costs",
+  "version": "1.0.0",
+  "description": "Track estimated Claude Code usage costs from GitHub PRs",
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

@@ -2,672 +2,744 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Code Usage Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Claude Code Costs</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --text-primary: #ffffff;
+            --text-secondary: #888;
+            --accent: #667eea;
+            --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success: #43e97b;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e8e8e8;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            background-attachment: fixed;
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 15px;
+            padding: 16px;
+            padding-bottom: 100px;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+        .container { max-width: 500px; margin: 0 auto; }
 
+        /* Header */
         header {
             display: flex;
-            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            padding-bottom: 15px;
+            padding-bottom: 16px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
-            gap: 10px;
         }
 
-        h1 {
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: #fff;
-        }
+        .logo { font-size: 1.3rem; font-weight: 700; }
+        .logo span { background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-        .header-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .sync-btn {
+            background: var(--accent-gradient);
             border: none;
             color: white;
             padding: 10px 16px;
-            border-radius: 8px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .sync-btn:hover { transform: translateY(-2px); }
+        .sync-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .sync-btn.syncing .sync-icon { animation: spin 1s linear infinite; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 4px;
+        }
+
+        .tabs::-webkit-scrollbar { display: none; }
+
+        .tab {
+            padding: 10px 18px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 25px;
             font-size: 0.85rem;
-            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid transparent;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        .tab.active {
+            background: var(--accent-gradient);
+            border-color: rgba(255,255,255,0.2);
         }
 
-        .btn-danger {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-        }
-
-        .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .upload-zone {
-            border: 2px dashed rgba(255,255,255,0.3);
-            border-radius: 16px;
-            padding: 40px 20px;
+        /* Main Cost Card */
+        .main-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 28px 24px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
             text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s;
-            background: rgba(255,255,255,0.02);
         }
 
-        .upload-zone.dragover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-        }
-
-        .upload-zone h2 {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-            color: #ccc;
-        }
-
-        .upload-zone p {
-            font-size: 0.85rem;
-            color: #888;
-            margin-bottom: 15px;
-        }
-
-        .upload-zone code {
-            background: rgba(0,0,0,0.3);
-            padding: 4px 8px;
-            border-radius: 4px;
+        .main-card-label {
             font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
 
-        .file-input {
-            display: none;
+        .main-cost {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #ccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
         }
 
-        .grid {
+        .main-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 12px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 18px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Chart Card */
         .card {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--bg-card);
             border-radius: 16px;
             padding: 20px;
+            margin-bottom: 16px;
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.08);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         .card-title {
             font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #888;
+            color: var(--text-secondary);
         }
 
-        .card-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+        /* Chart */
+        .chart-bar {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-
-        .icon-today { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-        .icon-5h { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-        .icon-month { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-        .icon-all { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
-
-        .cost-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 8px;
-        }
-
-        .request-count {
-            font-size: 0.8rem;
-            color: #888;
-        }
-
-        .token-breakdown {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .token-item {
-            font-size: 0.75rem;
-        }
-
-        .token-label {
-            color: #666;
-            display: block;
-        }
-
-        .token-value {
-            color: #fff;
-            font-weight: 500;
-        }
-
-        .model-list {
-            display: flex;
-            flex-direction: column;
+            margin-bottom: 10px;
             gap: 10px;
         }
 
-        .model-item {
-            background: rgba(255,255,255,0.03);
-            padding: 12px;
-            border-radius: 8px;
-        }
-
-        .model-name {
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
-        }
-
-        .model-stats {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.8rem;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-
-        .model-cost {
-            color: #4facfe;
-            font-weight: 600;
-        }
-
-        .model-requests {
-            color: #888;
-        }
-
-        .daily-chart {
-            margin-top: 15px;
-        }
-
-        .daily-bar {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-            gap: 8px;
-        }
-
-        .daily-label {
-            width: 70px;
+        .chart-label {
+            width: 38px;
             font-size: 0.75rem;
-            color: #888;
+            color: var(--text-secondary);
         }
 
-        .daily-bar-container {
+        .chart-bar-bg {
             flex: 1;
-            height: 20px;
+            height: 28px;
             background: rgba(255,255,255,0.05);
-            border-radius: 4px;
+            border-radius: 8px;
             overflow: hidden;
         }
 
-        .daily-bar-fill {
+        .chart-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            border-radius: 4px;
-            transition: width 0.5s ease;
+            background: var(--accent-gradient);
+            border-radius: 8px;
+            transition: width 0.6s ease;
+            min-width: 2px;
         }
 
-        .daily-value {
-            width: 70px;
-            text-align: right;
+        .chart-value {
+            width: 55px;
             font-size: 0.8rem;
+            text-align: right;
             font-weight: 500;
         }
 
-        .info-footer {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.75rem;
-            color: #666;
-            text-align: center;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #888;
-        }
-
-        .stats-row {
+        /* PR List */
+        .pr-item {
             display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.2s;
         }
 
-        .stat-badge {
+        .pr-item:hover { background: rgba(255,255,255,0.06); }
+
+        .pr-info { flex: 1; min-width: 0; }
+
+        .pr-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .pr-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .pr-cost {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-left: 12px;
+        }
+
+        /* Loading & Empty States */
+        .loading, .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .empty-icon { font-size: 4rem; margin-bottom: 16px; }
+
+        /* Status Badge */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .status-item { display: flex; align-items: center; gap: 6px; }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-dot.warning { background: #fee140; }
+        .status-dot.error { background: #ff6b6b; }
+
+        /* Model Selector */
+        .model-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .model-btn {
+            padding: 8px 16px;
             background: rgba(255,255,255,0.05);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 0.8rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .stat-badge span {
-            color: #fff;
-            font-weight: 600;
+        .model-btn:first-child { border-radius: 8px 0 0 8px; }
+        .model-btn:last-child { border-radius: 0 8px 8px 0; }
+        .model-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
         }
 
-        @media (max-width: 600px) {
-            .cost-value {
-                font-size: 1.6rem;
-            }
-
-            .grid {
-                grid-template-columns: 1fr;
-            }
-
-            header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .header-actions {
-                width: 100%;
-                justify-content: flex-start;
-            }
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.75rem;
+            color: #555;
         }
+
+        .footer a { color: var(--accent); text-decoration: none; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Claude Code Usage</h1>
-            <div class="header-actions">
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-                    + Add Files
-                </button>
-                <button class="btn btn-danger" onclick="clearData()" id="clearBtn" style="display:none;">
-                    Clear Data
-                </button>
-            </div>
+            <div class="logo">Claude <span>Costs</span></div>
+            <button class="sync-btn" id="syncBtn" onclick="syncData()">
+                <span class="sync-icon">🔄</span>
+                <span class="sync-text">Sync</span>
+            </button>
         </header>
 
-        <input type="file" id="fileInput" class="file-input" multiple accept=".jsonl">
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Loading...</span>
+            </div>
+            <div class="status-item">
+                <span id="lastSync">-</span>
+            </div>
+        </div>
 
-        <div id="uploadZone" class="upload-zone">
-            <h2>Drop your Claude Code usage files here</h2>
-            <p>Or click to browse. Files are stored locally in your browser.</p>
-            <p><code>~/.claude/projects/*/*.jsonl</code></p>
-            <br>
-            <button class="btn" onclick="document.getElementById('fileInput').click()">
-                Select JSONL Files
+        <!-- Model Selector -->
+        <div class="model-selector">
+            <button class="model-btn active" data-model="sonnet">Sonnet</button>
+            <button class="model-btn" data-model="opus">Opus</button>
+            <button class="model-btn" data-model="haiku">Haiku</button>
+        </div>
+
+        <!-- Time Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-period="today">Today</div>
+            <div class="tab" data-period="week">Week</div>
+            <div class="tab" data-period="month">Month</div>
+            <div class="tab" data-period="all">All Time</div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading">
+            <div class="spinner"></div>
+            <p>Loading your Claude PRs...</p>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" class="hidden">
+            <!-- Main Cost -->
+            <div class="main-card">
+                <div class="main-card-label">Estimated Cost</div>
+                <div class="main-cost" id="totalCost">$0.00</div>
+                <div class="main-subtitle" id="costSubtitle">Based on 0 PRs</div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">PRs</div>
+                    <div class="stat-value" id="prCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Lines Changed</div>
+                    <div class="stat-value" id="linesChanged">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Input Tokens</div>
+                    <div class="stat-value" id="inputTokens">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Output Tokens</div>
+                    <div class="stat-value" id="outputTokens">0</div>
+                </div>
+            </div>
+
+            <!-- Weekly Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Last 7 Days</span>
+                </div>
+                <div id="weeklyChart"></div>
+            </div>
+
+            <!-- Recent PRs -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Recent PRs</span>
+                </div>
+                <div id="prList"></div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state hidden">
+            <div class="empty-icon">🤖</div>
+            <h3>No Claude PRs Found</h3>
+            <p style="margin-top: 8px; max-width: 280px;">
+                PRs with "claude" in the branch name or title will appear here automatically.
+            </p>
+            <button class="sync-btn" style="margin-top: 20px;" onclick="syncData()">
+                🔄 Sync Now
             </button>
         </div>
 
-        <div id="dashboard" class="hidden">
-            <div class="stats-row">
-                <div class="stat-badge">Records: <span id="totalRecords">0</span></div>
-                <div class="stat-badge">Files: <span id="totalFiles">0</span></div>
-                <div class="stat-badge">Last updated: <span id="lastUpdated">-</span></div>
-            </div>
-
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Today</span>
-                        <div class="card-icon icon-today">📅</div>
-                    </div>
-                    <div class="cost-value" id="todayCost">$0.00</div>
-                    <div class="request-count" id="todayRequests">0 requests</div>
-                    <div class="token-breakdown" id="todayTokens"></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Last 5 Hours</span>
-                        <div class="card-icon icon-5h">⏱️</div>
-                    </div>
-                    <div class="cost-value" id="fiveHourCost">$0.00</div>
-                    <div class="request-count" id="fiveHourRequests">0 requests</div>
-                    <div class="token-breakdown" id="fiveHourTokens"></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">This Month</span>
-                        <div class="card-icon icon-month">📈</div>
-                    </div>
-                    <div class="cost-value" id="monthCost">$0.00</div>
-                    <div class="request-count" id="monthRequests">0 requests</div>
-                    <div class="token-breakdown" id="monthTokens"></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">All Time</span>
-                        <div class="card-icon icon-all">🤖</div>
-                    </div>
-                    <div class="cost-value" id="allTimeCost">$0.00</div>
-                    <div class="request-count" id="allTimeRequests">0 requests</div>
-                    <div class="token-breakdown" id="allTimeTokens"></div>
-                </div>
-            </div>
-
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Last 7 Days</span>
-                    </div>
-                    <div class="daily-chart" id="dailyChart"></div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">By Model</span>
-                    </div>
-                    <div class="model-list" id="modelList"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="info-footer">
-            <p>Data stored locally in your browser. Nothing is sent to any server.</p>
+        <div class="footer">
+            Tracking PRs for <a href="https://github.com/50thycal" target="_blank">@50thycal</a><br>
+            Estimates based on code changes • Not actual usage
         </div>
     </div>
 
     <script>
-        // Pricing per 1M tokens
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        const API_BASE = ''; // Empty for same-origin, or set to your Vercel URL
+
         const PRICING = {
-            "claude-opus-4-5-20251101": { name: "Claude Opus 4", input: 15, output: 75, cacheRead: 1.5, cacheCreate: 18.75 },
-            "claude-sonnet-4-20250514": { name: "Claude Sonnet 4", input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
-            "claude-3-5-sonnet-20241022": { name: "Claude 3.5 Sonnet", input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 },
-            "claude-3-5-haiku-20241022": { name: "Claude 3.5 Haiku", input: 0.8, output: 4, cacheRead: 0.08, cacheCreate: 1 },
-            "claude-3-haiku-20240307": { name: "Claude 3 Haiku", input: 0.25, output: 1.25, cacheRead: 0.025, cacheCreate: 0.3125 },
+            sonnet: { input: 3, output: 15, name: 'Claude Sonnet' },
+            opus: { input: 15, output: 75, name: 'Claude Opus' },
+            haiku: { input: 0.25, output: 1.25, name: 'Claude Haiku' }
         };
-        const DEFAULT_PRICING = { name: "Unknown", input: 3, output: 15, cacheRead: 0.3, cacheCreate: 3.75 };
 
-        let usageRecords = [];
-        let fileCount = 0;
+        const ESTIMATION = {
+            tokensPerLineAdded: 4,
+            tokensPerLineDeleted: 1,
+            contextTokensPerFile: 1000,
+            baseOverheadTokens: 5000,
+            outputOverheadTokens: 500
+        };
 
-        // Load from localStorage on start
-        function loadFromStorage() {
-            const stored = localStorage.getItem('claudeUsageData');
-            if (stored) {
-                const data = JSON.parse(stored);
-                usageRecords = data.records.map(r => ({ ...r, timestamp: new Date(r.timestamp) }));
-                fileCount = data.fileCount || 0;
-                if (usageRecords.length > 0) {
+        // ============================================
+        // APP STATE
+        // ============================================
+        let prData = [];
+        let selectedPeriod = 'today';
+        let selectedModel = localStorage.getItem('selectedModel') || 'sonnet';
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        async function init() {
+            // Setup tab listeners
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    selectedPeriod = tab.dataset.period;
                     updateDashboard();
+                });
+            });
+
+            // Setup model selector
+            document.querySelectorAll('.model-btn').forEach(btn => {
+                if (btn.dataset.model === selectedModel) {
+                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
                 }
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedModel = btn.dataset.model;
+                    localStorage.setItem('selectedModel', selectedModel);
+                    updateDashboard();
+                });
+            });
+
+            // Load last sync time
+            const lastSync = localStorage.getItem('lastSync');
+            if (lastSync) {
+                document.getElementById('lastSync').textContent = 'Synced ' + formatRelativeTime(new Date(lastSync));
             }
+
+            // Fetch data
+            await fetchData();
         }
 
-        function saveToStorage() {
-            localStorage.setItem('claudeUsageData', JSON.stringify({
-                records: usageRecords,
-                fileCount: fileCount,
-                savedAt: new Date().toISOString()
-            }));
-        }
+        // ============================================
+        // DATA FETCHING
+        // ============================================
+        async function fetchData() {
+            try {
+                updateStatus('loading', 'Loading...');
 
-        function clearData() {
-            if (confirm('Clear all usage data?')) {
-                usageRecords = [];
-                fileCount = 0;
-                localStorage.removeItem('claudeUsageData');
-                document.getElementById('dashboard').classList.add('hidden');
-                document.getElementById('uploadZone').classList.remove('hidden');
-                document.getElementById('clearBtn').style.display = 'none';
-            }
-        }
+                const response = await fetch(`${API_BASE}/api/prs`);
+                const data = await response.json();
 
-        function parseJSONL(content) {
-            const lines = content.split('\n').filter(l => l.trim());
-            const records = [];
+                if (data.success && data.prs) {
+                    prData = data.prs;
+                    updateStatus('success', `${data.count} PRs tracked`);
 
-            for (const line of lines) {
-                try {
-                    const record = JSON.parse(line);
-                    if (record.type === 'assistant' && record.message?.usage && record.message?.model) {
-                        const usage = record.message.usage;
-                        records.push({
-                            timestamp: new Date(record.timestamp),
-                            model: record.message.model,
-                            inputTokens: usage.input_tokens || 0,
-                            outputTokens: usage.output_tokens || 0,
-                            cacheReadTokens: usage.cache_read_input_tokens || 0,
-                            cacheCreateTokens: usage.cache_creation_input_tokens || 0,
-                        });
+                    if (prData.length > 0) {
+                        showDashboard();
+                    } else {
+                        showEmpty();
                     }
-                } catch (e) {}
-            }
-            return records;
-        }
-
-        function calculateCost(record) {
-            const pricing = PRICING[record.model] || DEFAULT_PRICING;
-            return (record.inputTokens / 1e6) * pricing.input +
-                   (record.outputTokens / 1e6) * pricing.output +
-                   (record.cacheReadTokens / 1e6) * pricing.cacheRead +
-                   (record.cacheCreateTokens / 1e6) * pricing.cacheCreate;
-        }
-
-        function aggregateRecords(records) {
-            const totals = {
-                inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0,
-                cost: 0, requests: 0, byModel: {}
-            };
-
-            for (const r of records) {
-                totals.inputTokens += r.inputTokens;
-                totals.outputTokens += r.outputTokens;
-                totals.cacheReadTokens += r.cacheReadTokens;
-                totals.cacheCreateTokens += r.cacheCreateTokens;
-                const cost = calculateCost(r);
-                totals.cost += cost;
-                totals.requests++;
-
-                const modelName = (PRICING[r.model] || DEFAULT_PRICING).name;
-                if (!totals.byModel[modelName]) {
-                    totals.byModel[modelName] = { cost: 0, requests: 0, tokens: 0 };
+                } else {
+                    throw new Error(data.error || 'Failed to fetch data');
                 }
-                totals.byModel[modelName].cost += cost;
-                totals.byModel[modelName].requests++;
-                totals.byModel[modelName].tokens += r.inputTokens + r.outputTokens;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                updateStatus('error', 'Connection error');
+                showEmpty();
             }
-            return totals;
         }
 
-        function formatCost(cost) {
-            return '$' + cost.toFixed(4);
+        async function syncData() {
+            const btn = document.getElementById('syncBtn');
+            btn.classList.add('syncing');
+            btn.disabled = true;
+            document.querySelector('.sync-text').textContent = 'Syncing...';
+
+            try {
+                updateStatus('loading', 'Syncing...');
+
+                const response = await fetch(`${API_BASE}/api/sync`, { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem('lastSync', new Date().toISOString());
+                    document.getElementById('lastSync').textContent = 'Synced just now';
+                    await fetchData();
+                } else {
+                    throw new Error(data.error || 'Sync failed');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateStatus('error', 'Sync failed');
+                alert('Sync failed: ' + error.message);
+            } finally {
+                btn.classList.remove('syncing');
+                btn.disabled = false;
+                document.querySelector('.sync-text').textContent = 'Sync';
+            }
         }
 
-        function formatTokens(n) {
-            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+        // ============================================
+        // COST ESTIMATION
+        // ============================================
+        function estimateCost(pr) {
+            const additions = pr.additions || 0;
+            const deletions = pr.deletions || 0;
+            const files = pr.changed_files || 1;
+
+            const inputTokens =
+                (files * ESTIMATION.contextTokensPerFile) +
+                ((additions + deletions) * 2) +
+                ESTIMATION.baseOverheadTokens;
+
+            const outputTokens =
+                (additions * ESTIMATION.tokensPerLineAdded) +
+                ESTIMATION.outputOverheadTokens;
+
+            const pricing = PRICING[selectedModel];
+            const cost = (inputTokens / 1e6 * pricing.input) + (outputTokens / 1e6 * pricing.output);
+
+            return { inputTokens, outputTokens, cost };
+        }
+
+        // ============================================
+        // UI UPDATES
+        // ============================================
+        function showDashboard() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            updateDashboard();
+        }
+
+        function showEmpty() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+        }
+
+        function updateStatus(type, text) {
+            const dot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            dot.className = 'status-dot';
+            if (type === 'error') dot.classList.add('error');
+            else if (type === 'loading') dot.classList.add('warning');
+
+            statusText.textContent = text;
+        }
+
+        function updateDashboard() {
+            const now = new Date();
+            const filtered = prData.filter(pr => {
+                const prDate = new Date(pr.created_at);
+                switch (selectedPeriod) {
+                    case 'today':
+                        return prDate.toDateString() === now.toDateString();
+                    case 'week':
+                        return prDate >= new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    case 'month':
+                        return prDate.getMonth() === now.getMonth() && prDate.getFullYear() === now.getFullYear();
+                    default:
+                        return true;
+                }
+            });
+
+            let totalCost = 0, totalInput = 0, totalOutput = 0, totalLines = 0;
+
+            filtered.forEach(pr => {
+                const est = estimateCost(pr);
+                totalCost += est.cost;
+                totalInput += est.inputTokens;
+                totalOutput += est.outputTokens;
+                totalLines += (pr.additions || 0) + (pr.deletions || 0);
+            });
+
+            document.getElementById('totalCost').textContent = '$' + totalCost.toFixed(2);
+            document.getElementById('costSubtitle').textContent = `Based on ${filtered.length} PRs • ${PRICING[selectedModel].name}`;
+            document.getElementById('prCount').textContent = filtered.length;
+            document.getElementById('linesChanged').textContent = formatNumber(totalLines);
+            document.getElementById('inputTokens').textContent = formatNumber(totalInput);
+            document.getElementById('outputTokens').textContent = formatNumber(totalOutput);
+
+            updateWeeklyChart();
+            updatePRList(filtered.slice(0, 10));
+        }
+
+        function updateWeeklyChart() {
+            const now = new Date();
+            const days = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date(now - i * 24 * 60 * 60 * 1000);
+                const dayPRs = prData.filter(pr => new Date(pr.created_at).toDateString() === date.toDateString());
+
+                let dayCost = 0;
+                dayPRs.forEach(pr => dayCost += estimateCost(pr).cost);
+
+                days.push({
+                    label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+                    cost: dayCost
+                });
+            }
+
+            const maxCost = Math.max(...days.map(d => d.cost), 0.01);
+
+            document.getElementById('weeklyChart').innerHTML = days.map(day => `
+                <div class="chart-bar">
+                    <span class="chart-label">${day.label}</span>
+                    <div class="chart-bar-bg">
+                        <div class="chart-bar-fill" style="width: ${Math.max((day.cost / maxCost) * 100, 2)}%"></div>
+                    </div>
+                    <span class="chart-value">$${day.cost.toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+
+        function updatePRList(prs) {
+            if (prs.length === 0) {
+                document.getElementById('prList').innerHTML = `
+                    <div style="text-align: center; padding: 30px; color: var(--text-secondary);">
+                        No PRs in this period
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('prList').innerHTML = prs.map(pr => {
+                const est = estimateCost(pr);
+                const repoName = pr.repo_name.split('/')[1] || pr.repo_name;
+                return `
+                    <a href="${pr.pr_url}" target="_blank" class="pr-item">
+                        <div class="pr-info">
+                            <div class="pr-title">${escapeHtml(pr.title)}</div>
+                            <div class="pr-meta">${repoName} • +${pr.additions}/-${pr.deletions}</div>
+                        </div>
+                        <div class="pr-cost">$${est.cost.toFixed(2)}</div>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        // ============================================
+        // UTILITIES
+        // ============================================
+        function formatNumber(n) {
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
             if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
             return n.toString();
         }
 
-        function renderTokens(containerId, data) {
-            document.getElementById(containerId).innerHTML = `
-                <div class="token-item"><span class="token-label">Input</span><span class="token-value">${formatTokens(data.inputTokens)}</span></div>
-                <div class="token-item"><span class="token-label">Output</span><span class="token-value">${formatTokens(data.outputTokens)}</span></div>
-                <div class="token-item"><span class="token-label">Cache Read</span><span class="token-value">${formatTokens(data.cacheReadTokens)}</span></div>
-                <div class="token-item"><span class="token-label">Cache Create</span><span class="token-value">${formatTokens(data.cacheCreateTokens)}</span></div>
-            `;
+        function formatRelativeTime(date) {
+            const diff = Date.now() - date.getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return hours + 'h ago';
+            return Math.floor(hours / 24) + 'd ago';
         }
 
-        function updateDashboard() {
-            if (usageRecords.length === 0) return;
-
-            document.getElementById('uploadZone').classList.add('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
-            document.getElementById('clearBtn').style.display = 'inline-block';
-
-            const now = new Date();
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const fiveHoursAgo = new Date(now - 5 * 60 * 60 * 1000);
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-            const today = aggregateRecords(usageRecords.filter(r => r.timestamp >= todayStart));
-            const fiveHour = aggregateRecords(usageRecords.filter(r => r.timestamp >= fiveHoursAgo));
-            const month = aggregateRecords(usageRecords.filter(r => r.timestamp >= monthStart));
-            const allTime = aggregateRecords(usageRecords);
-
-            // Update cards
-            document.getElementById('todayCost').textContent = formatCost(today.cost);
-            document.getElementById('todayRequests').textContent = `${today.requests} requests`;
-            renderTokens('todayTokens', today);
-
-            document.getElementById('fiveHourCost').textContent = formatCost(fiveHour.cost);
-            document.getElementById('fiveHourRequests').textContent = `${fiveHour.requests} requests`;
-            renderTokens('fiveHourTokens', fiveHour);
-
-            document.getElementById('monthCost').textContent = formatCost(month.cost);
-            document.getElementById('monthRequests').textContent = `${month.requests} requests`;
-            renderTokens('monthTokens', month);
-
-            document.getElementById('allTimeCost').textContent = formatCost(allTime.cost);
-            document.getElementById('allTimeRequests').textContent = `${allTime.requests} requests`;
-            renderTokens('allTimeTokens', allTime);
-
-            // Daily chart
-            const dailyData = [];
-            for (let i = 0; i < 7; i++) {
-                const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-                const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-                const dayRecords = usageRecords.filter(r => r.timestamp >= dayStart && r.timestamp < dayEnd);
-                const dayAgg = aggregateRecords(dayRecords);
-                dailyData.push({
-                    label: dayStart.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                    cost: dayAgg.cost
-                });
-            }
-
-            const maxCost = Math.max(...dailyData.map(d => d.cost), 0.01);
-            document.getElementById('dailyChart').innerHTML = dailyData.map(d => `
-                <div class="daily-bar">
-                    <span class="daily-label">${d.label}</span>
-                    <div class="daily-bar-container">
-                        <div class="daily-bar-fill" style="width: ${(d.cost / maxCost) * 100}%"></div>
-                    </div>
-                    <span class="daily-value">${formatCost(d.cost)}</span>
-                </div>
-            `).join('');
-
-            // Model breakdown
-            const models = Object.entries(allTime.byModel).sort((a, b) => b[1].cost - a[1].cost);
-            document.getElementById('modelList').innerHTML = models.length ? models.map(([name, data]) => `
-                <div class="model-item">
-                    <div class="model-name">${name}</div>
-                    <div class="model-stats">
-                        <span class="model-cost">${formatCost(data.cost)}</span>
-                        <span class="model-requests">${data.requests} req | ${formatTokens(data.tokens)} tokens</span>
-                    </div>
-                </div>
-            `).join('') : '<p style="color:#666">No data</p>';
-
-            // Stats
-            document.getElementById('totalRecords').textContent = usageRecords.length;
-            document.getElementById('totalFiles').textContent = fileCount;
-            document.getElementById('lastUpdated').textContent = now.toLocaleTimeString();
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
         }
-
-        async function handleFiles(files) {
-            for (const file of files) {
-                if (!file.name.endsWith('.jsonl')) continue;
-                const text = await file.text();
-                const newRecords = parseJSONL(text);
-
-                // Dedupe by timestamp + model (simple approach)
-                const existingKeys = new Set(usageRecords.map(r => r.timestamp.getTime() + r.model));
-                for (const r of newRecords) {
-                    const key = r.timestamp.getTime() + r.model;
-                    if (!existingKeys.has(key)) {
-                        usageRecords.push(r);
-                        existingKeys.add(key);
-                    }
-                }
-                fileCount++;
-            }
-
-            usageRecords.sort((a, b) => a.timestamp - b.timestamp);
-            saveToStorage();
-            updateDashboard();
-        }
-
-        // Event listeners
-        const uploadZone = document.getElementById('uploadZone');
-        const fileInput = document.getElementById('fileInput');
-
-        uploadZone.addEventListener('dragover', e => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-
-        uploadZone.addEventListener('drop', e => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
-        });
-
-        fileInput.addEventListener('change', e => {
-            handleFiles(e.target.files);
-            e.target.value = '';
-        });
 
         // Initialize
-        loadFromStorage();
+        init();
     </script>
 </body>
 </html>
