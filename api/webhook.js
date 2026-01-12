@@ -1,10 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
   // Only accept POST requests
@@ -12,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify this is a GitHub webhook (optional: add secret verification)
+  // Verify this is a GitHub webhook
   const event = req.headers['x-github-event'];
 
   if (event !== 'pull_request') {
@@ -25,12 +19,12 @@ export default async function handler(req, res) {
     const pr = payload.pull_request;
     const repo = payload.repository;
 
-    // Only process opened, closed, or synchronize events
+    // Only process relevant events
     if (!['opened', 'closed', 'synchronize', 'reopened'].includes(action)) {
       return res.status(200).json({ message: 'Ignored action: ' + action });
     }
 
-    // Check if this is a Claude PR (branch name or title contains 'claude')
+    // Check if this is a Claude PR
     const branchName = pr.head?.ref || '';
     const title = pr.title || '';
 
@@ -42,7 +36,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'Not a Claude PR, ignored' });
     }
 
-    // Fetch full PR details to get additions/deletions
+    // Fetch full PR details for additions/deletions
     const prDetailsResponse = await fetch(pr.url, {
       headers: {
         'Accept': 'application/vnd.github.v3+json',
@@ -70,15 +64,9 @@ export default async function handler(req, res) {
       user_login: pr.user?.login
     };
 
-    // Upsert to Supabase
-    const { error } = await supabase
-      .from('claude_prs')
-      .upsert(prData, { onConflict: 'pr_id' });
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(500).json({ error: 'Database error', details: error.message });
-    }
+    // Store in Vercel KV
+    await kv.hset(`pr:${pr.id}`, prData);
+    await kv.sadd('claude_pr_ids', pr.id);
 
     console.log(`Processed PR #${pr.number} from ${repo.full_name}: ${action}`);
 

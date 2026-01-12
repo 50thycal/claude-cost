@@ -4,6 +4,6 @@
   "description": "Track estimated Claude Code usage costs from GitHub PRs",
   "private": true,
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
+    "@vercel/kv": "^2.0.0"
   }
 }

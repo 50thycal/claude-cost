@@ -1,15 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -20,20 +14,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch all Claude PRs
-    const { data, error } = await supabase
-      .from('claude_prs')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Get all PRs from KV (stored as a hash map by pr_id)
+    const prIds = await kv.smembers('claude_pr_ids') || [];
 
-    if (error) {
-      throw new Error('Database error: ' + error.message);
+    if (prIds.length === 0) {
+      return res.status(200).json({ success: true, prs: [], count: 0 });
     }
+
+    // Fetch all PR data
+    const prs = [];
+    for (const prId of prIds) {
+      const pr = await kv.hgetall(`pr:${prId}`);
+      if (pr) {
+        prs.push(pr);
+      }
+    }
+
+    // Sort by created_at descending
+    prs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     return res.status(200).json({
       success: true,
-      prs: data || [],
-      count: data?.length || 0
+      prs,
+      count: prs.length
     });
 
   } catch (error) {

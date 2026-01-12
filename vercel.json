@@ -17,9 +17,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_SERVICE_KEY": "@supabase-service-key"
-  }
+  ]
 }

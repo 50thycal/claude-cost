@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+import { kv } from '@vercel/kv';
 
 const GITHUB_USERNAME = '50thycal';
 
@@ -11,7 +6,6 @@ export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -38,11 +32,11 @@ export default async function handler(req, res) {
       throw new Error('Failed to fetch repos: ' + JSON.stringify(repos));
     }
 
-    let allPRs = [];
+    let prsFound = 0;
     let processedRepos = 0;
 
     // For each repo, fetch PRs
-    for (const repo of repos.slice(0, 30)) { // Limit to 30 repos
+    for (const repo of repos.slice(0, 30)) {
       try {
         const prsResponse = await fetch(
           `https://api.github.com/repos/${repo.full_name}/pulls?state=all&per_page=100`,
@@ -73,7 +67,7 @@ export default async function handler(req, res) {
           });
           const prDetail = await prDetailResponse.json();
 
-          allPRs.push({
+          const prData = {
             pr_id: pr.id,
             repo_name: repo.full_name,
             repo_owner: repo.owner.login,
@@ -89,7 +83,13 @@ export default async function handler(req, res) {
             merged_at: pr.merged_at,
             pr_url: pr.html_url,
             user_login: pr.user?.login
-          });
+          };
+
+          // Store PR in KV
+          await kv.hset(`pr:${pr.id}`, prData);
+          await kv.sadd('claude_pr_ids', pr.id);
+
+          prsFound++;
         }
 
         processedRepos++;
@@ -98,21 +98,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // Upsert all PRs to Supabase
-    if (allPRs.length > 0) {
-      const { error } = await supabase
-        .from('claude_prs')
-        .upsert(allPRs, { onConflict: 'pr_id' });
-
-      if (error) {
-        throw new Error('Database error: ' + error.message);
-      }
-    }
-
     return res.status(200).json({
       success: true,
       repos_processed: processedRepos,
-      prs_found: allPRs.length,
+      prs_found: prsFound,
       synced_at: new Date().toISOString()
     });
 
