@@ -1,7 +1,5 @@
 import { kv } from '@vercel/kv';
 
-const GITHUB_USERNAME = '50thycal';
-
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,9 +14,26 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Get username from query params, body, or stored setting
+    let username = req.query.username || req.body?.username;
+
+    // If no username provided, try to get from stored settings
+    if (!username) {
+      username = await kv.get('github_username');
+    }
+
+    if (!username) {
+      return res.status(400).json({
+        error: 'No GitHub username configured. Please set it in settings.'
+      });
+    }
+
+    // Store the username for future use
+    await kv.set('github_username', username);
+
     // Fetch user's public repos
     const reposResponse = await fetch(
-      `https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=updated`,
+      `https://api.github.com/users/${username}/repos?per_page=100&sort=updated`,
       {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
