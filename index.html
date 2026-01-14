@@ -1311,18 +1311,23 @@
         // ============================================
         const API_BASE = ''; // Empty for same-origin, or set to your Vercel URL
 
+        // Pricing per 1M tokens (Updated January 2025)
         const PRICING = {
-            sonnet: { input: 3, output: 15, name: 'Claude Sonnet' },
-            opus: { input: 15, output: 75, name: 'Claude Opus' },
-            haiku: { input: 0.25, output: 1.25, name: 'Claude Haiku' }
+            sonnet: { input: 3, output: 15, name: 'Claude Sonnet 4', cacheRead: 0.30, cacheCreation: 3.75 },
+            opus: { input: 5, output: 25, name: 'Claude Opus 4.5', cacheRead: 0.50, cacheCreation: 6.25 },
+            haiku: { input: 1, output: 5, name: 'Claude Haiku 4.5', cacheRead: 0.10, cacheCreation: 1.25 }
         };
 
+        // Estimation constants - calibrated for typical Claude Code sessions
+        // These account for multiple iterations, tool calls, and context loading
         const ESTIMATION = {
-            tokensPerLineAdded: 4,
-            tokensPerLineDeleted: 1,
-            contextTokensPerFile: 1000,
-            baseOverheadTokens: 5000,
-            outputOverheadTokens: 500
+            tokensPerLineAdded: 15,       // Lines added require generation + iterations
+            tokensPerLineDeleted: 5,      // Deletions require context understanding
+            contextTokensPerFile: 3000,   // Average file context loaded per file
+            baseOverheadTokens: 15000,    // System prompt, tools, conversation history
+            outputOverheadTokens: 2000,   // Tool results, reasoning, explanations
+            averageIterations: 5,         // Typical number of API calls per PR
+            cacheHitRate: 0.6             // ~60% of input typically cached after first call
         };
 
         // ============================================
@@ -1555,20 +1560,48 @@
             const additions = pr.additions || 0;
             const deletions = pr.deletions || 0;
             const files = pr.changed_files || 1;
+            const iterations = ESTIMATION.averageIterations;
+            const cacheHitRate = ESTIMATION.cacheHitRate;
 
-            const inputTokens =
+            // Base tokens per single API call
+            const baseInputPerCall =
                 (files * ESTIMATION.contextTokensPerFile) +
-                ((additions + deletions) * 2) +
+                (additions * ESTIMATION.tokensPerLineAdded) +
+                (deletions * ESTIMATION.tokensPerLineDeleted) +
                 ESTIMATION.baseOverheadTokens;
 
-            const outputTokens =
+            const baseOutputPerCall =
                 (additions * ESTIMATION.tokensPerLineAdded) +
                 ESTIMATION.outputOverheadTokens;
 
-            const pricing = PRICING[model];
-            const cost = (inputTokens / 1e6 * pricing.input) + (outputTokens / 1e6 * pricing.output);
+            // Total tokens across all iterations
+            // First call: full input cost
+            // Subsequent calls: benefit from cache (cacheHitRate portion is cached)
+            const firstCallInput = baseInputPerCall;
+            const cachedCallInput = baseInputPerCall * (1 - cacheHitRate); // Only uncached portion at full price
+            const cachedTokensPerCall = baseInputPerCall * cacheHitRate;
 
-            return { inputTokens, outputTokens, cost };
+            // Calculate costs with caching
+            const pricing = PRICING[model];
+
+            // First iteration: full input price
+            let inputCost = (firstCallInput / 1e6) * pricing.input;
+
+            // Subsequent iterations: mix of cached reads and fresh input
+            const subsequentIterations = Math.max(0, iterations - 1);
+            inputCost += subsequentIterations * (cachedCallInput / 1e6) * pricing.input;
+            inputCost += subsequentIterations * (cachedTokensPerCall / 1e6) * pricing.cacheRead;
+
+            // Output cost (no caching on output)
+            const totalOutputTokens = baseOutputPerCall * iterations;
+            const outputCost = (totalOutputTokens / 1e6) * pricing.output;
+
+            // Total tokens for display (simplified view)
+            const inputTokens = Math.round(baseInputPerCall * iterations);
+            const outputTokens = Math.round(totalOutputTokens);
+            const cost = inputCost + outputCost;
+
+            return { inputTokens, outputTokens, cost, iterations };
         }
 
         function updateAllModelsTotals(sonnetCost, opusCost, haikuCost) {
