@@ -12,22 +12,48 @@ from flask import Flask, render_template_string, jsonify
 
 app = Flask(__name__)
 
-# Pricing per 1M tokens (as of 2024)
+# Pricing per 1M tokens (Updated January 2025)
+# Source: https://platform.claude.com/docs/en/about-claude/pricing
 PRICING = {
-    "claude-opus-4-5-20251101": {
-        "name": "Claude Opus 4",
-        "input": 15.00,
-        "output": 75.00,
-        "cache_read": 1.50,  # 90% off input price
-        "cache_creation": 18.75,  # 25% more than input
+    # Claude 4.5 Series (Latest - January 2025)
+    "claude-opus-4-5-20250514": {
+        "name": "Claude Opus 4.5",
+        "input": 5.00,
+        "output": 25.00,
+        "cache_read": 0.50,  # 90% off input price
+        "cache_creation": 6.25,  # 25% more than input
     },
-    "claude-sonnet-4-20250514": {
-        "name": "Claude Sonnet 4",
+    "claude-sonnet-4-5-20250514": {
+        "name": "Claude Sonnet 4.5",
         "input": 3.00,
         "output": 15.00,
         "cache_read": 0.30,  # 90% off input price
         "cache_creation": 3.75,  # 25% more than input
     },
+    # Claude 4 Series
+    "claude-opus-4-20250514": {
+        "name": "Claude Opus 4",
+        "input": 15.00,
+        "output": 75.00,
+        "cache_read": 1.50,
+        "cache_creation": 18.75,
+    },
+    "claude-sonnet-4-20250514": {
+        "name": "Claude Sonnet 4",
+        "input": 3.00,
+        "output": 15.00,
+        "cache_read": 0.30,
+        "cache_creation": 3.75,
+    },
+    # Legacy model ID for Opus 4.5 (backwards compatibility)
+    "claude-opus-4-5-20251101": {
+        "name": "Claude Opus 4.5",
+        "input": 5.00,
+        "output": 25.00,
+        "cache_read": 0.50,
+        "cache_creation": 6.25,
+    },
+    # Claude 3.5 Series
     "claude-3-5-sonnet-20241022": {
         "name": "Claude 3.5 Sonnet",
         "input": 3.00,
@@ -42,12 +68,21 @@ PRICING = {
         "cache_read": 0.08,
         "cache_creation": 1.00,
     },
+    # Claude 3 Series (Legacy)
     "claude-3-haiku-20240307": {
         "name": "Claude 3 Haiku",
         "input": 0.25,
         "output": 1.25,
         "cache_read": 0.025,
         "cache_creation": 0.3125,
+    },
+    # Haiku 4.5 (Latest Haiku)
+    "claude-haiku-4-5-20250514": {
+        "name": "Claude Haiku 4.5",
+        "input": 1.00,
+        "output": 5.00,
+        "cache_read": 0.10,
+        "cache_creation": 1.25,
     },
 }
 
