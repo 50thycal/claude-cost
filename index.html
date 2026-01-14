@@ -426,31 +426,6 @@
         .status-dot.warning { background: #fee140; }
         .status-dot.error { background: #ff6b6b; }
 
-        /* Model Selector */
-        .model-selector {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .model-btn {
-            padding: 8px 16px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .model-btn:first-child { border-radius: 8px 0 0 8px; }
-        .model-btn:last-child { border-radius: 0 8px 8px 0; }
-        .model-btn.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
-        }
-
         /* Footer */
         .footer {
             text-align: center;
@@ -1070,13 +1045,6 @@
         <!-- ========== DASHBOARD PAGE ========== -->
         <div class="page-content active" id="dashboardPage">
 
-        <!-- Model Selector -->
-        <div class="model-selector">
-            <button class="model-btn active" data-model="sonnet">Sonnet</button>
-            <button class="model-btn" data-model="opus">Opus</button>
-            <button class="model-btn" data-model="haiku">Haiku</button>
-        </div>
-
         <!-- Time Tabs -->
         <div class="tabs">
             <div class="tab active" data-period="today">Today</div>
@@ -1357,7 +1325,6 @@
         // ============================================
         let prData = [];
         let selectedPeriod = 'today';
-        let selectedModel = localStorage.getItem('selectedModel') || 'sonnet';
         let githubUsername = '';
         let currentPage = 'dashboard';
         let repoSortBy = 'cost';
@@ -1466,21 +1433,6 @@
                 });
             });
 
-            // Setup model selector
-            document.querySelectorAll('.model-btn').forEach(btn => {
-                if (btn.dataset.model === selectedModel) {
-                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                }
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedModel = btn.dataset.model;
-                    localStorage.setItem('selectedModel', selectedModel);
-                    updateDashboard();
-                });
-            });
-
             // Setup page navigation
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
@@ -1583,26 +1535,6 @@
         // ============================================
         // COST ESTIMATION
         // ============================================
-        function estimateCost(pr) {
-            const additions = pr.additions || 0;
-            const deletions = pr.deletions || 0;
-            const files = pr.changed_files || 1;
-
-            const inputTokens =
-                (files * ESTIMATION.contextTokensPerFile) +
-                ((additions + deletions) * 2) +
-                ESTIMATION.baseOverheadTokens;
-
-            const outputTokens =
-                (additions * ESTIMATION.tokensPerLineAdded) +
-                ESTIMATION.outputOverheadTokens;
-
-            const pricing = PRICING[selectedModel];
-            const cost = (inputTokens / 1e6 * pricing.input) + (outputTokens / 1e6 * pricing.output);
-
-            return { inputTokens, outputTokens, cost };
-        }
-
         function estimateCostForModel(pr, model) {
             const additions = pr.additions || 0;
             const deletions = pr.deletions || 0;
@@ -1623,19 +1555,11 @@
             return { inputTokens, outputTokens, cost };
         }
 
-        function updateAllModelsTotals(filtered) {
-            let sonnetTotal = 0, opusTotal = 0, haikuTotal = 0;
-
-            filtered.forEach(pr => {
-                sonnetTotal += estimateCostForModel(pr, 'sonnet').cost;
-                opusTotal += estimateCostForModel(pr, 'opus').cost;
-                haikuTotal += estimateCostForModel(pr, 'haiku').cost;
-            });
-
-            document.getElementById('sonnetTotal').textContent = '$' + sonnetTotal.toFixed(2);
-            document.getElementById('opusTotal').textContent = '$' + opusTotal.toFixed(2);
-            document.getElementById('haikuTotal').textContent = '$' + haikuTotal.toFixed(2);
-            document.getElementById('combinedTotal').textContent = '$' + (sonnetTotal + opusTotal + haikuTotal).toFixed(2);
+        function updateAllModelsTotals(sonnetCost, opusCost, haikuCost) {
+            document.getElementById('sonnetTotal').textContent = '$' + sonnetCost.toFixed(2);
+            document.getElementById('opusTotal').textContent = '$' + opusCost.toFixed(2);
+            document.getElementById('haikuTotal').textContent = '$' + haikuCost.toFixed(2);
+            document.getElementById('combinedTotal').textContent = '$' + (sonnetCost + opusCost + haikuCost).toFixed(2);
         }
 
         // ============================================
@@ -1692,22 +1616,29 @@
                 }
             });
 
-            let totalCost = 0, totalInput = 0, totalOutput = 0, totalLines = 0;
+            let totalInput = 0, totalOutput = 0, totalLines = 0;
             let totalAdditions = 0, totalDeletions = 0, totalFiles = 0;
+            let sonnetCost = 0, opusCost = 0, haikuCost = 0;
 
             filtered.forEach(pr => {
-                const est = estimateCost(pr);
-                totalCost += est.cost;
-                totalInput += est.inputTokens;
-                totalOutput += est.outputTokens;
+                const sonnetEst = estimateCostForModel(pr, 'sonnet');
+                const opusEst = estimateCostForModel(pr, 'opus');
+                const haikuEst = estimateCostForModel(pr, 'haiku');
+
+                sonnetCost += sonnetEst.cost;
+                opusCost += opusEst.cost;
+                haikuCost += haikuEst.cost;
+                totalInput += sonnetEst.inputTokens; // Same for all models
+                totalOutput += sonnetEst.outputTokens; // Same for all models
                 totalLines += (pr.additions || 0) + (pr.deletions || 0);
                 totalAdditions += pr.additions || 0;
                 totalDeletions += pr.deletions || 0;
                 totalFiles += pr.changed_files || 0;
             });
+            const combinedTotal = sonnetCost + opusCost + haikuCost;
 
-            document.getElementById('totalCost').textContent = '$' + totalCost.toFixed(2);
-            document.getElementById('costSubtitle').textContent = `Based on ${filtered.length} PRs • ${PRICING[selectedModel].name}`;
+            document.getElementById('totalCost').textContent = '$' + combinedTotal.toFixed(2);
+            document.getElementById('costSubtitle').textContent = `Based on ${filtered.length} PRs • All Models Combined`;
             document.getElementById('prCount').textContent = filtered.length;
             document.getElementById('linesChanged').textContent = formatNumber(totalLines);
             document.getElementById('inputTokens').textContent = formatNumber(totalInput);
@@ -1722,7 +1653,7 @@
                 : 0;
 
             // Update all models totals
-            updateAllModelsTotals(filtered);
+            updateAllModelsTotals(sonnetCost, opusCost, haikuCost);
 
             // Calculate streak and most active day
             updateProductivityStats();
@@ -1901,7 +1832,11 @@
                 const dayPRs = prData.filter(pr => new Date(pr.created_at).toDateString() === date.toDateString());
 
                 let dayCost = 0;
-                dayPRs.forEach(pr => dayCost += estimateCost(pr).cost);
+                dayPRs.forEach(pr => {
+                    dayCost += estimateCostForModel(pr, 'sonnet').cost +
+                               estimateCostForModel(pr, 'opus').cost +
+                               estimateCostForModel(pr, 'haiku').cost;
+                });
 
                 days.push({
                     label: date.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -1933,7 +1868,9 @@
             }
 
             document.getElementById('prList').innerHTML = prs.map(pr => {
-                const est = estimateCost(pr);
+                const combinedCost = estimateCostForModel(pr, 'sonnet').cost +
+                                     estimateCostForModel(pr, 'opus').cost +
+                                     estimateCostForModel(pr, 'haiku').cost;
                 const repoName = pr.repo_name.split('/')[1] || pr.repo_name;
                 return `
                     <a href="${pr.pr_url}" target="_blank" class="pr-item">
@@ -1941,7 +1878,7 @@
                             <div class="pr-title">${escapeHtml(pr.title)}</div>
                             <div class="pr-meta">${repoName} • +${pr.additions}/-${pr.deletions}</div>
                         </div>
-                        <div class="pr-cost">$${est.cost.toFixed(2)}</div>
+                        <div class="pr-cost">$${combinedCost.toFixed(2)}</div>
                     </a>
                 `;
             }).join('');
@@ -1966,7 +1903,9 @@
                     };
                 }
 
-                const cost = estimateCost(pr).cost;
+                const cost = estimateCostForModel(pr, 'sonnet').cost +
+                             estimateCostForModel(pr, 'opus').cost +
+                             estimateCostForModel(pr, 'haiku').cost;
                 const lines = (pr.additions || 0) + (pr.deletions || 0);
 
                 repoMap[repoName].prs.push(pr);
@@ -2050,7 +1989,7 @@
                         </div>
                         <div class="repo-cost">
                             <div class="repo-cost-value">$${repo.cost.toFixed(2)}</div>
-                            <div class="repo-cost-label">${PRICING[selectedModel].name}</div>
+                            <div class="repo-cost-label">Combined</div>
                         </div>
                     </a>
                 `;
@@ -2090,7 +2029,10 @@
             }
 
             logList.innerHTML = filtered.map(pr => {
-                const cost = estimateCost(pr);
+                const sonnetEst = estimateCostForModel(pr, 'sonnet');
+                const opusEst = estimateCostForModel(pr, 'opus');
+                const haikuEst = estimateCostForModel(pr, 'haiku');
+                const combinedCost = sonnetEst.cost + opusEst.cost + haikuEst.cost;
                 const repoName = pr.repo_name.split('/')[1] || pr.repo_name;
                 const merged = pr.merged_at || pr.merged;
                 const state = merged ? 'merged' : (pr.state || 'open');
@@ -2123,10 +2065,10 @@
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div class="pr-log-meta" style="margin-bottom: 0;">
                                 <div class="pr-log-meta-item">
-                                    ~${formatNumber(cost.inputTokens)} input / ~${formatNumber(cost.outputTokens)} output tokens
+                                    ~${formatNumber(sonnetEst.inputTokens)} input / ~${formatNumber(sonnetEst.outputTokens)} output tokens
                                 </div>
                             </div>
-                            <span class="pr-log-cost">$${cost.cost.toFixed(2)}</span>
+                            <span class="pr-log-cost">$${combinedCost.toFixed(2)}</span>
                         </div>
                     </div>
                 `;
