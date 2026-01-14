@@ -14,17 +14,19 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // Get current settings
       const username = await kv.get('github_username');
+      const token = await kv.get('github_token');
       return res.status(200).json({
         success: true,
         settings: {
-          github_username: username || ''
+          github_username: username || '',
+          github_token: token ? '••••••••' : '' // Mask token for security
         }
       });
     }
 
     if (req.method === 'POST') {
       // Update settings
-      const { github_username } = req.body;
+      const { github_username, github_token } = req.body;
 
       if (github_username !== undefined) {
         if (github_username) {
@@ -34,10 +36,21 @@ export default async function handler(req, res) {
         }
       }
 
+      if (github_token !== undefined) {
+        if (github_token && github_token !== '••••••••') {
+          await kv.set('github_token', github_token);
+        } else if (github_token === '') {
+          await kv.del('github_token');
+        }
+        // If token is '••••••••', keep existing token (no change)
+      }
+
+      const currentToken = await kv.get('github_token');
       return res.status(200).json({
         success: true,
         settings: {
-          github_username: github_username || ''
+          github_username: github_username || '',
+          github_token: currentToken ? '••••••••' : ''
         }
       });
     }

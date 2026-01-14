@@ -1021,6 +1021,11 @@
                     <input type="text" class="form-input" id="githubUsername" placeholder="e.g. 50thycal">
                     <div class="form-hint">The GitHub account to track Claude PRs from</div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">GitHub Token (Optional)</label>
+                    <input type="password" class="form-input" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
+                    <div class="form-hint">Personal Access Token for higher rate limits (5000/hr vs 60/hr). <a href="https://github.com/settings/tokens" target="_blank" style="color: #58a6ff;">Generate token</a></div>
+                </div>
                 <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">Save Settings</button>
             </div>
         </div>
@@ -1333,9 +1338,12 @@
         // ============================================
         // SETTINGS FUNCTIONS
         // ============================================
+        let githubToken = '';
+
         function openSettings() {
             document.getElementById('settingsModal').classList.add('active');
             document.getElementById('githubUsername').value = githubUsername;
+            document.getElementById('githubToken').value = githubToken;
         }
 
         function closeSettings() {
@@ -1348,7 +1356,9 @@
                 const data = await response.json();
                 if (data.success && data.settings) {
                     githubUsername = data.settings.github_username || '';
+                    githubToken = data.settings.github_token || '';
                     document.getElementById('githubUsername').value = githubUsername;
+                    document.getElementById('githubToken').value = githubToken;
                     updateTrackedUserDisplay();
                 }
             } catch (error) {
@@ -1370,7 +1380,9 @@
         async function saveSettings() {
             const btn = document.getElementById('saveSettingsBtn');
             const usernameInput = document.getElementById('githubUsername');
+            const tokenInput = document.getElementById('githubToken');
             const newUsername = usernameInput.value.trim();
+            const newToken = tokenInput.value.trim();
 
             btn.disabled = true;
             btn.textContent = 'Saving...';
@@ -1379,12 +1391,16 @@
                 const response = await fetch(`${API_BASE}/api/settings`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ github_username: newUsername })
+                    body: JSON.stringify({
+                        github_username: newUsername,
+                        github_token: newToken
+                    })
                 });
                 const data = await response.json();
 
                 if (data.success) {
                     githubUsername = newUsername;
+                    githubToken = data.settings.github_token || '';
                     updateTrackedUserDisplay();
                     closeSettings();
                     // Auto-sync after saving username
